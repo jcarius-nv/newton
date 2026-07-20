@@ -66,6 +66,28 @@ changes, dependency constraints, and migration guidance.
     not duplicated under an older released version and the historical section
     still reflects what actually shipped there.
 
+## Post-release Merge-back
+
+After a release branch finalizes its changelog, merge that release section back
+to `main` through a dedicated feature branch and a changelog-only PR:
+
+1. Fetch the canonical remote and create the feature branch from the latest
+   `upstream/main`, not from the release branch.
+2. Treat the final tag (or `upstream/release-X.Y` before the tag is available)
+   as the source of truth for the complete `## [X.Y.Z] - YYYY-MM-DD` section.
+3. Keep `## [Unreleased]` as the first version header on `main`. Preserve every
+   post-cut entry already present there; do not replace the whole file with the
+   release-branch copy.
+4. Insert the finalized release section immediately below `[Unreleased]` and
+   remove only the entries that are now represented in that release section.
+   Leave later-development entries under `[Unreleased]`.
+5. Verify the PR changes only `CHANGELOG.md`, the released section matches the
+   final tag, and no entry appears in both `[Unreleased]` and `[X.Y.Z]`.
+
+If another maintainer is already preparing the merge-back, do not create a
+competing changelog edit. Confirm the current `upstream/main` and coordinate on
+the existing branch or PR instead.
+
 ## Checks
 
 Run targeted searches before finishing:
