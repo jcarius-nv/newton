@@ -1,22 +1,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 
-###########################################################################
-# Example Robot asRoBallet
-#
-# Demonstrates LQR and learned-policy control for the asRoBallet robot
-# (RSS 2026: https://arxiv.org/abs/2604.24916).
-#
-# Hold "i"/"k" to move forward/backward and "j"/"l" to move left/right.
-# Hold "u"/"o" to turn left/right. Nonzero velocity arguments select fixed
-# command mode instead of keyboard control. The policy controller is used by
-# default; pass "--controller lqr" to use LQR.
-# Pass "--virtual-ball-joint" to constrain the ball center to the base using
-# the original asRoBallet spherical joint.
-#
-# Command: python -m newton.examples robot_asroballet
-#
-###########################################################################
+"""Demonstrate LQR and learned-policy control for the asRoBallet robot.
+
+Hold "i"/"k" to move forward/backward, "j"/"l" to move left/right,
+and "u"/"o" to turn left/right. Nonzero velocity arguments select fixed
+command mode instead of keyboard control. Pass ``--virtual-ball-joint`` to
+constrain the ball center to the base using the original asRoBallet spherical
+joint.
+
+The robot was introduced in the RSS 2026 paper: https://arxiv.org/abs/2604.24916.
+"""
 
 import math
 from dataclasses import dataclass
@@ -30,6 +24,25 @@ import newton
 import newton.examples
 import newton.utils
 from newton.examples.robot.onnx_policy_utils import validate_policy_io_shapes
+
+_EXAMPLE_SPEC = {
+    "schema_version": 1,
+    "success_criteria": (
+        "The asRoBallet robot appears balanced on its ball.",
+        "After the viewer has keyboard focus, the robot responds to the i/k, j/l, and u/o controls.",
+        "The robot remains upright without the base separating from the ball.",
+    ),
+    "runs": (
+        {
+            "args": ("--controller", "policy"),
+            "success_criteria": ("The learned-policy controller responds to the commanded motion.",),
+        },
+        {
+            "args": ("--controller", "lqr"),
+            "success_criteria": ("The LQR controller responds to the commanded motion.",),
+        },
+    ),
+}
 
 ASROBALLET_SCENE_PATH = Path("mjcf") / "scene_floating_ball.xml"
 ASROBALLET_VIRTUAL_BALL_JOINT_SCENE_PATH = Path("mjcf") / "scene.xml"

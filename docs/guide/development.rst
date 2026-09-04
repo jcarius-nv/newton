@@ -671,6 +671,80 @@ implement both. In test mode, ``test_post_step()`` runs after each simulation
 step and ``test_final()`` runs after the example completes. An example that
 implements neither raises ``NotImplementedError`` in CI.
 
+Embedded success criteria
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Every runnable example must keep its human-readable success criteria beside its
+implementation in a literal ``_EXAMPLE_SPEC`` dictionary. The module docstring
+is the specification's required general description, so the description remains
+available through Python's normal documentation tools without being duplicated.
+Common criteria apply to every run; each run records only its command-line
+arguments and any additional criteria:
+
+.. code-block:: python
+
+    """Demonstrate an example behavior."""
+
+    _EXAMPLE_SPEC = {
+        "schema_version": 1,
+        "success_criteria": (
+            "The mechanism remains upright.",
+        ),
+        "runs": (
+            {
+                "args": (),
+                "success_criteria": (),
+            },
+            {
+                "args": ("--solver", "xpbd"),
+                "success_criteria": (
+                    "The XPBD solver completes the same motion.",
+                ),
+            },
+        ),
+    }
+
+Keep the value static and literal so tooling can inspect it without importing
+the example or initializing optional dependencies. The ``--describe`` command
+prints the complete specification to standard output. It emits a Markdown
+document by default and can emit structured JSON for automation:
+
+.. code-block:: console
+
+    python -m newton.examples --describe <example_name>
+    python -m newton.examples --describe <example_name> --format json
+
+The Markdown document contains the example name, its module-docstring
+description, common success criteria, and each supported command with its
+additional criteria. The strings in ``_EXAMPLE_SPEC`` are plain text; the
+command supplies the Markdown structure around them.
+
+JSON output contract
+~~~~~~~~~~~~~~~~~~~~
+
+The JSON document is a versioned machine-readable interface with these fields:
+
+``schema_version``
+    The integer schema version. The current version is ``1``. Producers may add
+    compatible fields without changing this number; consumers should ignore
+    unknown fields. Removing or changing the meaning or type of an existing
+    field requires a new schema version.
+
+``name``
+    The example name accepted by ``python -m newton.examples``.
+
+``description``
+    The non-empty general description extracted from the module docstring.
+
+``success_criteria``
+    An ordered array of non-empty strings that apply to every documented run.
+
+``runs``
+    A non-empty ordered array of run objects. Each run contains ``args`` (the
+    ordered array of command-line argument strings), ``command`` (the complete
+    shell command), and ``success_criteria`` (an ordered array of additional
+    criteria for that run, which may be empty).
+
 Discovery and registration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 

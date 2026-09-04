@@ -1,28 +1,48 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 
-###########################################################################
-# Example Cable Bundle Hysteresis
-#
-# Demonstrates Dahl friction model for cable bending hysteresis.
-# Creates a bundle of 7 cables passing through moving obstacles that
-# apply cyclic loading (load -> hold -> release). The Dahl model captures
-# plastic deformation and hysteresis loops in cable bending behavior,
-# showing realistic memory effects in cable dynamics.
-#
-# Run interactively:
-#   uv run --extra examples python -m newton.examples.cable.example_cable_bundle_hysteresis
-#
-# Run as a test:
-#   uv run --extra examples python -m newton.examples.cable.example_cable_bundle_hysteresis --test --viewer null
-#
-###########################################################################
+"""Demonstrate the Dahl friction model for cable bending hysteresis.
+
+Seven cables pass through moving obstacles that apply cyclic loading: load,
+hold, then release. The Dahl model captures plastic deformation and hysteresis
+loops, showing memory effects in the cable dynamics.
+"""
 
 import numpy as np
 import warp as wp
 
 import newton
 import newton.examples
+
+_EXAMPLE_SPEC = {
+    "schema_version": 1,
+    "success_criteria": (
+        "Seven cables are bent by four vertical capsules into an S pattern.",
+        "After the capsules disappear, the cables settle without exploding.",
+    ),
+    "runs": (
+        {
+            "args": ("--no-dahl",),
+            "success_criteria": ("The cables are mostly straight.",),
+        },
+        {
+            "args": (),
+            "success_criteria": ("The cables keep a clear S shape.",),
+        },
+        {
+            "args": ("--segments", "15"),
+            "success_criteria": ("The cables have a more irregular S shape and fewer distinct colors.",),
+        },
+        {
+            "args": ("--eps-max", "0.3"),
+            "success_criteria": ("The cables retain a less-pronounced S shape than the default run.",),
+        },
+        {
+            "args": ("--tau", "10.0"),
+            "success_criteria": ("The cables become mostly straight.",),
+        },
+    ),
+}
 
 
 @wp.kernel
@@ -434,10 +454,19 @@ class Example:
         if np.min(arc_length_ratios) < 0.8 or np.max(arc_length_ratios) > 1.2:
             raise ValueError(f"Cable bundle changed length excessively: {metrics}")
 
-        if self.with_dahl and (np.min(straightness) < 0.5 or np.max(straightness) > 0.9):
-            raise ValueError(f"Dahl cable bundle did not retain plausible curvature: {metrics}")
-        if not self.with_dahl and np.min(straightness) < 0.9:
-            raise ValueError(f"Elastic cable bundle did not recover: {metrics}")
+        # The documented low-plasticity and long-memory runs intentionally settle straighter than the default run.
+        if not self.with_dahl or self.args.tau >= 10.0:
+            straightness_min, straightness_max = 0.9, 1.0
+        elif self.args.eps_max <= 0.3:
+            straightness_min, straightness_max = 0.85, 0.97
+        else:
+            straightness_min, straightness_max = 0.5, 0.9
+
+        if np.min(straightness) < straightness_min or np.max(straightness) > straightness_max:
+            raise ValueError(
+                f"Cable bundle final shape is outside the expected straightness range "
+                f"[{straightness_min}, {straightness_max}]: {metrics}"
+            )
 
     @staticmethod
     def create_parser():

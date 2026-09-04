@@ -10,6 +10,22 @@ import warp as wp
 
 import newton
 
+_EXAMPLE_SPEC = {
+    "schema_version": 1,
+    "success_criteria": (
+        "A four-wheel warehouse robot and a separate ballbot appear supported above the ground.",
+        "The warehouse robot completes visible forward, lateral, and turning phases.",
+        "The warehouse robot does not fall through the ground or become unstable during direction changes.",
+        "The ballbot remains upright, supported by its ball, and does not visibly separate from it.",
+    ),
+    "runs": (
+        {
+            "args": (),
+            "success_criteria": (),
+        },
+    ),
+}
+
 
 @wp.kernel
 def set_mecanum_targets(
