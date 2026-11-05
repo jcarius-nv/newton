@@ -678,25 +678,34 @@ Temporal checks without per-step readback
 Use :class:`newton.examples.ExampleTestMonitor` when a condition must hold
 throughout a simulation. Register predicates and physical thresholds beside the
 example code, observe device state in ``test_post_step()``, and read accumulated
-results in ``test_final()``:
+results in ``test_final()``. Put test methods and predicates after the main
+simulation code so readers encounter setup, stepping, and rendering first.
+A cached property keeps check registration in that test-only section and
+initializes the monitor only when a test hook accesses it:
 
 .. code-block:: python
 
-    # In Example.__init__, after constructing self.model:
-    self.test_monitor = None
-    if args.test:
-        self.test_monitor = newton.examples.ExampleTestMonitor(self.model)
-        self.test_monitor.add_body_check(
-            "remains settled",
-            lambda q, qd: max(abs(qd)) < 0.015,
-            start_time=8.0,
-        )
+    from functools import cached_property
 
-    # In Example.test_post_step:
-    self.test_monitor.observe(self.state_0, self.sim_time)
+    class Example:
+        # Define simulation setup, stepping, and rendering above this section.
 
-    # In Example.test_final, alongside other final-state assertions:
-    self.test_monitor.assert_valid()
+        @cached_property
+        def _test_monitor(self):
+            monitor = newton.examples.ExampleTestMonitor(self.model)
+            monitor.add_body_check(
+                "remains settled",
+                lambda q, qd: max(abs(qd)) < 0.015,
+                start_time=8.0,
+            )
+            return monitor
+
+        def test_post_step(self):
+            self._test_monitor.observe(self.state_0, self.sim_time)
+
+        def test_final(self):
+            self._test_monitor.assert_valid()
+            # Keep other example-specific final-state assertions here.
 
 Each predicate accepts one body's pose/twist or one particle's
 position/velocity and returns whether it is valid. Optional indices select a

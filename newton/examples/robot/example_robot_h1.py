@@ -19,6 +19,8 @@ Runs:
 - `python -m newton.examples robot_h1 --solver kamino`
 """
 
+from functools import cached_property
+
 import warp as wp
 
 import newton
@@ -137,15 +139,6 @@ class Example:
         self.viewer.set_model(self.model)
         self.viewer.set_world_offsets((3.0, 3.0, 0.0))
 
-        self._test_monitor = None
-        if args.test and self.solver_type == "kamino":
-            self._test_monitor = newton.examples.ExampleTestMonitor(self.model)
-            self._test_monitor.add_body_check(
-                "body velocities remain small after settling",
-                lambda q, qd: max(abs(qd)) < 0.015,
-                start_time=8.0,
-            )
-
         self.capture()
 
     def capture(self):
@@ -189,6 +182,27 @@ class Example:
         self.viewer.log_contacts(self.contacts, self.state_0, observables=self.solver_observables)
         self.viewer.end_frame()
 
+    @staticmethod
+    def create_parser():
+        parser = newton.examples.create_parser()
+        newton.examples.add_world_count_arg(parser)
+        newton.examples.add_mujoco_contacts_arg(parser)
+        parser.add_argument("--solver", choices=["mujoco", "kamino"], default="mujoco")
+        parser.set_defaults(world_count=4)
+        return parser
+
+    @cached_property
+    def _test_monitor(self) -> newton.examples.ExampleTestMonitor | None:
+        if self.solver_type != "kamino":
+            return None
+        monitor = newton.examples.ExampleTestMonitor(self.model)
+        monitor.add_body_check(
+            "body velocities remain small after settling",
+            lambda q, qd: max(abs(qd)) < 0.015,
+            start_time=8.0,
+        )
+        return monitor
+
     def test_final(self):
         """Verify the robot settles without actuating its floating base."""
         if self._test_monitor is not None:
@@ -220,15 +234,6 @@ class Example:
         """Verify Kamino remains settled after the initial eight seconds."""
         if self._test_monitor is not None:
             self._test_monitor.observe(self.state_0, self.sim_time)
-
-    @staticmethod
-    def create_parser():
-        parser = newton.examples.create_parser()
-        newton.examples.add_world_count_arg(parser)
-        newton.examples.add_mujoco_contacts_arg(parser)
-        parser.add_argument("--solver", choices=["mujoco", "kamino"], default="mujoco")
-        parser.set_defaults(world_count=4)
-        return parser
 
 
 if __name__ == "__main__":
