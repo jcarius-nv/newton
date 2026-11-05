@@ -137,7 +137,8 @@ def api_modules() -> list[str]:
         if mod_name.startswith("newton."):
             modules.append(mod_name)
 
-    return modules
+    # Example support has a public API but is not imported by the Newton root.
+    return sorted([*modules, "newton.examples"])
 
 
 def _is_solver_only_module(mod: ModuleType) -> bool:

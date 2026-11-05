@@ -21,6 +21,8 @@ Runs:
 
 from __future__ import annotations
 
+from functools import cached_property
+
 import numpy as np
 import warp as wp
 from newton.solvers.experimental.coupled import SolverCoupled, SolverCoupledProxy
@@ -161,34 +163,6 @@ class Example:
         else:
             self.simulate()
         self.sim_time += self.frame_dt
-
-    def test_final(self):
-        self._assert_finite_particles()
-
-    def test_post_step(self):
-        self._assert_finite_particles()
-
-    def _assert_finite_particles(self):
-        particle_q = self.state_0.particle_q.numpy()
-        particle_qd = self.state_0.particle_qd.numpy()
-        assert np.isfinite(particle_q).all(), f"Particle positions contain NaN or inf values at t={self.sim_time:.4f}"
-        assert np.isfinite(particle_qd).all(), f"Particle velocities contain NaN or inf values at t={self.sim_time:.4f}"
-
-        xpbd_q = particle_q[self.xpbd_particles]
-        mpm_q = particle_q[self.mpm_particles]
-        xpbd_qd = particle_qd[self.xpbd_particles]
-        mpm_qd = particle_qd[self.mpm_particles]
-        xpbd_min = np.min(xpbd_q, axis=0)
-        xpbd_max = np.max(xpbd_q, axis=0)
-        mpm_min = np.min(mpm_q, axis=0)
-        mpm_max = np.max(mpm_q, axis=0)
-
-        assert np.linalg.norm(xpbd_max - xpbd_min) < 4.0, "XPBD particles exploded"
-        assert np.linalg.norm(mpm_max - mpm_min) < 5.0, "MPM cube exploded"
-        assert np.max(np.linalg.norm(xpbd_qd, axis=1)) < 40.0, "XPBD particle velocities exploded"
-        assert np.max(np.linalg.norm(mpm_qd, axis=1)) < 40.0, "MPM particle velocities exploded"
-        assert xpbd_min[2] > -0.20, f"XPBD particles penetrated the ground: z_min={xpbd_min[2]:.4f}"
-        assert mpm_min[2] > -0.20, f"MPM particles penetrated the ground: z_min={mpm_min[2]:.4f}"
 
     def render(self):
         render_state = newton.examples.get_coupled_view_state(self)
@@ -398,6 +372,66 @@ class Example:
             default=18.0,
         )
         return parser
+
+    @cached_property
+    def _test_monitor(self) -> newton.examples.ExampleTestMonitor:
+        monitor = newton.examples.ExampleTestMonitor(self.model)
+        monitor.add_particle_check(
+            "XPBD particles remain finite and bounded",
+            _particle_is_bounded,
+            indices=self.xpbd_particles,
+            max_extent=4.0,
+        )
+        monitor.add_particle_check(
+            "MPM particles remain finite and bounded",
+            _particle_is_bounded,
+            indices=self.mpm_particles,
+            max_extent=5.0,
+        )
+        return monitor
+
+    def test_post_step(self):
+        self._test_monitor.observe(self.state_0, self.sim_time)
+
+    def test_final(self):
+        self._test_monitor.assert_valid()
+        self._assert_finite_particles()
+
+    def _assert_finite_particles(self):
+        particle_q = self.state_0.particle_q.numpy()
+        particle_qd = self.state_0.particle_qd.numpy()
+        assert np.isfinite(particle_q).all(), f"Particle positions contain NaN or inf values at t={self.sim_time:.4f}"
+        assert np.isfinite(particle_qd).all(), f"Particle velocities contain NaN or inf values at t={self.sim_time:.4f}"
+
+        xpbd_q = particle_q[self.xpbd_particles]
+        mpm_q = particle_q[self.mpm_particles]
+        xpbd_qd = particle_qd[self.xpbd_particles]
+        mpm_qd = particle_qd[self.mpm_particles]
+        xpbd_min = np.min(xpbd_q, axis=0)
+        xpbd_max = np.max(xpbd_q, axis=0)
+        mpm_min = np.min(mpm_q, axis=0)
+        mpm_max = np.max(mpm_q, axis=0)
+
+        assert np.linalg.norm(xpbd_max - xpbd_min) < 4.0, "XPBD particles exploded"
+        assert np.linalg.norm(mpm_max - mpm_min) < 5.0, "MPM cube exploded"
+        assert np.max(np.linalg.norm(xpbd_qd, axis=1)) < 40.0, "XPBD particle velocities exploded"
+        assert np.max(np.linalg.norm(mpm_qd, axis=1)) < 40.0, "MPM particle velocities exploded"
+        assert xpbd_min[2] > -0.20, f"XPBD particles penetrated the ground: z_min={xpbd_min[2]:.4f}"
+        assert mpm_min[2] > -0.20, f"MPM particles penetrated the ground: z_min={mpm_min[2]:.4f}"
+
+
+@wp.func
+def _particle_is_bounded(q: wp.vec3, qd: wp.vec3):
+    return (
+        wp.isfinite(q[0])
+        and wp.isfinite(q[1])
+        and wp.isfinite(q[2])
+        and wp.isfinite(qd[0])
+        and wp.isfinite(qd[1])
+        and wp.isfinite(qd[2])
+        and wp.length(qd) < 40.0
+        and q[2] > -0.20
+    )
 
 
 if __name__ == "__main__":

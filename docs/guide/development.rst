@@ -672,6 +672,55 @@ Every example must implement ``test_final()``; it may additionally implement
 after the example completes. An example without a callable ``test_final()``
 raises ``NotImplementedError`` in CI.
 
+Temporal checks without per-step readback
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use :class:`newton.examples.ExampleTestMonitor` when a condition must hold
+throughout a simulation. Register predicates and physical thresholds beside the
+example code, observe device state in ``test_post_step()``, and read accumulated
+results in ``test_final()``. Put test methods and predicates after the main
+simulation code so readers encounter setup, stepping, and rendering first.
+A cached property keeps check registration in that test-only section and
+initializes the monitor only when a test hook accesses it:
+
+.. code-block:: python
+
+    from functools import cached_property
+
+    class Example:
+        # Define simulation setup, stepping, and rendering above this section.
+
+        @cached_property
+        def _test_monitor(self):
+            monitor = newton.examples.ExampleTestMonitor(self.model)
+            monitor.add_body_check(
+                "remains settled",
+                lambda q, qd: max(abs(qd)) < 0.015,
+                start_time=8.0,
+            )
+            return monitor
+
+        def test_post_step(self):
+            self._test_monitor.observe(self.state_0, self.sim_time)
+
+        def test_final(self):
+            self._test_monitor.assert_valid()
+            # Keep other example-specific final-state assertions here.
+
+Each predicate accepts one body's pose/twist or one particle's
+position/velocity and returns whether it is valid. Optional indices select a
+subset. Particle checks can also bound the subset's axis-aligned bounding-box
+diagonal with ``max_extent`` [m]. Failures persist even if the simulation
+recovers; a required time window that is never observed also fails. Observation
+runs outside the simulation CUDA graph, without per-step host readback. Final
+validation reads one compact record per registered check.
+
+Retain temporal coverage when migrating checks. In particular, checking only the
+last frame cannot detect an earlier explosion, penetration, or velocity spike.
+Keep existing final assertions and test durations unless a separate change
+justifies modifying them. This test-only facility does not validate rendering,
+user interaction, reset behavior, or physical accuracy beyond the predicates.
+
 Embedded success criteria
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 

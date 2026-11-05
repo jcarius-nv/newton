@@ -21,23 +21,12 @@ Runs:
 - `python -m newton.examples basic_joints --solver kamino`
 """
 
+from functools import cached_property
+
 import warp as wp
 
 import newton
 import newton.examples
-
-
-@wp.func
-def _ball_body_stays_on_joint_sphere(q: wp.transform, qd: wp.spatial_vector):
-    return abs(wp.length(wp.transform_get_translation(q) - wp.vec3(0.0, 3.0, 2.05)) - 0.75) < 5e-3
-
-
-@wp.func
-def _slider_constrained_motion_has_stopped(q: wp.transform, qd: wp.spatial_vector):
-    return (
-        wp.length(wp.cross(wp.spatial_top(qd), wp.vec3(0.0, 0.0, 1.0))) < 1e-5
-        and wp.length(wp.spatial_bottom(qd)) < 1e-5
-    )
 
 
 class Example:
@@ -261,24 +250,33 @@ class Example:
 
         self.sim_time += self.frame_dt
 
-    def test_post_step(self):
-        newton.examples.test_body_state(
-            self.model,
-            self.state_0,
+    def render(self):
+        self.viewer.begin_frame(self.sim_time)
+        self.viewer.log_state(self.state_0)
+        if self.contacts is not None:
+            self.viewer.log_contacts(self.contacts, self.state_0)
+        self.viewer.end_frame()
+
+    @cached_property
+    def _test_monitor(self) -> newton.examples.ExampleTestMonitor:
+        monitor = newton.examples.ExampleTestMonitor(self.model)
+        monitor.add_body_check(
             "revolute motion in plane",
             lambda q, qd: wp.length(abs(wp.cross(wp.spatial_bottom(qd), wp.vec3(1.0, 0.0, 0.0)))) < 1e-5,
             indices=[self.model.body_label.index("b_rev")],
         )
-
-        newton.examples.test_body_state(
-            self.model,
-            self.state_0,
+        monitor.add_body_check(
             "linear motion on axis",
             _slider_constrained_motion_has_stopped,
             indices=[self.model.body_label.index("b_prismatic")],
         )
+        return monitor
+
+    def test_post_step(self):
+        self._test_monitor.observe(self.state_0, self.sim_time)
 
     def test_final(self):
+        self._test_monitor.assert_valid()
         newton.examples.test_body_state(
             self.model,
             self.state_0,
@@ -343,12 +341,18 @@ class Example:
             indices=[self.model.body_label.index("b_ball")],
         )
 
-    def render(self):
-        self.viewer.begin_frame(self.sim_time)
-        self.viewer.log_state(self.state_0)
-        if self.contacts is not None:
-            self.viewer.log_contacts(self.contacts, self.state_0)
-        self.viewer.end_frame()
+
+@wp.func
+def _ball_body_stays_on_joint_sphere(q: wp.transform, qd: wp.spatial_vector):
+    return abs(wp.length(wp.transform_get_translation(q) - wp.vec3(0.0, 3.0, 2.05)) - 0.75) < 5e-3
+
+
+@wp.func
+def _slider_constrained_motion_has_stopped(q: wp.transform, qd: wp.spatial_vector):
+    return (
+        wp.length(wp.cross(wp.spatial_top(qd), wp.vec3(0.0, 0.0, 1.0))) < 1e-5
+        and wp.length(wp.spatial_bottom(qd)) < 1e-5
+    )
 
 
 if __name__ == "__main__":

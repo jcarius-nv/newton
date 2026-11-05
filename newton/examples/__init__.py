@@ -21,6 +21,8 @@ import warp as wp
 import newton
 from newton.tests.unittest_utils import find_nan_members
 
+from ._test_monitor import ExampleTestMonitor
+
 _DEPRECATED_WARP_CONFIG_KEYS = {"quiet", "verbose"}
 logger = logging.getLogger(__name__)
 
@@ -1110,6 +1112,7 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "ExampleTestMonitor",
     "add_broad_phase_arg",
     "add_max_worlds_arg",
     "add_mujoco_contacts_arg",
