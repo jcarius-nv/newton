@@ -1,0 +1,1 @@
+Add experimental `newton.examples.ExampleTestMonitor` for device-side temporal assertions with final failure reporting, and migrate joint, coupled-particle, and H1 settling checks to avoid per-step host readback.

@@ -231,6 +231,20 @@ class Example:
 
         self.viewer.set_model(self.model)
 
+        self._test_monitor = None
+        if getattr(args, "test", False):
+            self._test_monitor = newton.examples.ExampleTestMonitor(self.model)
+            self._test_monitor.add_body_check(
+                "revolute motion in plane",
+                lambda q, qd: wp.length(abs(wp.cross(wp.spatial_bottom(qd), wp.vec3(1.0, 0.0, 0.0)))) < 1e-5,
+                indices=[self.model.body_label.index("b_rev")],
+            )
+            self._test_monitor.add_body_check(
+                "linear motion on axis",
+                _slider_constrained_motion_has_stopped,
+                indices=[self.model.body_label.index("b_prismatic")],
+            )
+
         self.capture()
 
     def capture(self):
@@ -262,23 +276,10 @@ class Example:
         self.sim_time += self.frame_dt
 
     def test_post_step(self):
-        newton.examples.test_body_state(
-            self.model,
-            self.state_0,
-            "revolute motion in plane",
-            lambda q, qd: wp.length(abs(wp.cross(wp.spatial_bottom(qd), wp.vec3(1.0, 0.0, 0.0)))) < 1e-5,
-            indices=[self.model.body_label.index("b_rev")],
-        )
-
-        newton.examples.test_body_state(
-            self.model,
-            self.state_0,
-            "linear motion on axis",
-            _slider_constrained_motion_has_stopped,
-            indices=[self.model.body_label.index("b_prismatic")],
-        )
+        self._test_monitor.observe(self.state_0, self.sim_time)
 
     def test_final(self):
+        self._test_monitor.assert_valid()
         newton.examples.test_body_state(
             self.model,
             self.state_0,

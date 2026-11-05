@@ -137,6 +137,15 @@ class Example:
         self.viewer.set_model(self.model)
         self.viewer.set_world_offsets((3.0, 3.0, 0.0))
 
+        self._test_monitor = None
+        if args.test and self.solver_type == "kamino":
+            self._test_monitor = newton.examples.ExampleTestMonitor(self.model)
+            self._test_monitor.add_body_check(
+                "body velocities remain small after settling",
+                lambda q, qd: max(abs(qd)) < 0.015,
+                start_time=8.0,
+            )
+
         self.capture()
 
     def capture(self):
@@ -182,6 +191,8 @@ class Example:
 
     def test_final(self):
         """Verify the robot settles without actuating its floating base."""
+        if self._test_monitor is not None:
+            self._test_monitor.assert_valid()
         target_mode = self.model.joint_target_mode.numpy()
         target_ke = self.model.joint_target_ke.numpy()
         target_kd = self.model.joint_target_kd.numpy()
@@ -207,13 +218,8 @@ class Example:
 
     def test_post_step(self):
         """Verify Kamino remains settled after the initial eight seconds."""
-        if self.solver_type == "kamino" and self.sim_time >= 8.0:
-            newton.examples.test_body_state(
-                self.model,
-                self.state_0,
-                "body velocities remain small after settling",
-                lambda q, qd: max(abs(qd)) < 0.015,
-            )
+        if self._test_monitor is not None:
+            self._test_monitor.observe(self.state_0, self.sim_time)
 
     @staticmethod
     def create_parser():

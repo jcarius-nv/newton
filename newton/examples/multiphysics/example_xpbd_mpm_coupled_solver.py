@@ -40,6 +40,20 @@ def _gather_particles(
     out_q[i] = particle_q[particle_ids[i]]
 
 
+@wp.func
+def _particle_is_bounded(q: wp.vec3, qd: wp.vec3):
+    return (
+        wp.isfinite(q[0])
+        and wp.isfinite(q[1])
+        and wp.isfinite(q[2])
+        and wp.isfinite(qd[0])
+        and wp.isfinite(qd[1])
+        and wp.isfinite(qd[2])
+        and wp.length(qd) < 40.0
+        and q[2] > -0.20
+    )
+
+
 class Example:
     def __init__(self, viewer, args):
         self.viewer = viewer
@@ -138,6 +152,22 @@ class Example:
             len(self.mpm_particles), wp.vec3(0.72, 0.59, 0.38), dtype=wp.vec3, device=self.model.device
         )
 
+        self._test_monitor = None
+        if args.test:
+            self._test_monitor = newton.examples.ExampleTestMonitor(self.model)
+            self._test_monitor.add_particle_check(
+                "XPBD particles remain finite and bounded",
+                _particle_is_bounded,
+                indices=self.xpbd_particles,
+                max_extent=4.0,
+            )
+            self._test_monitor.add_particle_check(
+                "MPM particles remain finite and bounded",
+                _particle_is_bounded,
+                indices=self.mpm_particles,
+                max_extent=5.0,
+            )
+
         self.graph = None
         self.capture()
 
@@ -163,10 +193,11 @@ class Example:
         self.sim_time += self.frame_dt
 
     def test_final(self):
+        self._test_monitor.assert_valid()
         self._assert_finite_particles()
 
     def test_post_step(self):
-        self._assert_finite_particles()
+        self._test_monitor.observe(self.state_0, self.sim_time)
 
     def _assert_finite_particles(self):
         particle_q = self.state_0.particle_q.numpy()

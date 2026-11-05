@@ -10,6 +10,7 @@
    api/newton_actuators
    api/newton_config
    api/newton_controllers
+   api/newton_examples
    api/newton_exceptions
    api/newton_geometry
    api/newton_ik
